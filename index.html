@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title> 記帳Web </title>
+  <title>記帳 Web</title>
   
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="記帳Web">
+  <meta name="apple-mobile-web-app-title" content="記帳 Web">
   
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%23111827%22/><text y=%22.9em%22 x=%227%22 font-size=%2276%22>💰</text></svg>">
   
@@ -23,6 +23,7 @@
       background-color: #0b0f19;
       color: #f3f4f6;
       -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
     .safe-bottom {
       padding-bottom: env(safe-area-inset-bottom);
@@ -32,38 +33,58 @@
       -webkit-overflow-scrolling: touch;
     }
     .page-slide {
-      transition: transform 0.3s ease-in-out;
+      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    input {
+      font-size: 16px !important;
+    }
+
+    /* 🚀 左右滑動卡片核心 CSS */
+    .snap-x-container {
+      display: flex;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
+    }
+    /* 隱藏滾動條 */
+    .snap-x-container::-webkit-scrollbar {
+      display: none;
+    }
+    .snap-card {
+      min-width: 100%;
+      scroll-snap-align: center;
+      scroll-snap-stop: always;
     }
   </style>
 </head>
-<body class="font-sans antialiased">
+<body class="font-sans antialiased text-gray-200">
 
   <div id="main-screen" class="flex flex-col h-full justify-between p-6 pt-12">
     
     <div class="flex justify-between items-center w-full">
-      <span class="text-xl font-bold text-gray-200">記帳Web</span>
-      <span class="text-xs text-gray-500 bg-gray-900 border border-gray-800 px-2.5 py-1 rounded-full">⚡️ 雲端即時連動</span>
+      <span class="text-xl font-bold text-gray-200">記帳 Web</span>
+      <span id="current-month-badge" class="text-xs text-indigo-400 font-semibold bg-indigo-950/50 border border-indigo-900/60 px-3 py-1 rounded-full">2026 年 06 月</span>
     </div>
 
-    <div class="flex flex-col items-center justify-center space-y-4 my-2">
-      <div class="text-center">
-        <p class="text-xs text-gray-400 tracking-wider">本月累計消費</p>
-        <h1 id="total-amount" class="text-4xl font-extrabold text-indigo-400 mt-0.5">$0</h1>
-      </div>
-      
-      <div class="w-44 h-44 relative flex items-center justify-center">
+    <div class="my-2">
+      <div id="month-slider" class="snap-x-container w-full" onscroll="handleSliderScroll()">
+        </div>
+    </div>
+
+    <div class="flex flex-col items-center justify-center space-y-2 my-1">
+      <div class="w-40 h-40 relative flex items-center justify-center">
         <canvas id="expense-chart"></canvas>
-        <div id="no-data-tip" class="absolute text-gray-500 text-xs hidden">本月尚無數據</div>
+        <div id="no-data-tip" class="absolute text-gray-500 text-xs hidden">該月尚無數據</div>
       </div>
     </div>
 
     <div class="flex-1 flex flex-col min-h-0 mb-4">
       <div class="flex justify-between items-center mb-2">
-        <p class="text-xs text-gray-400 font-medium">近期消費紀錄</p>
+        <p id="list-title" class="text-xs text-gray-400 font-medium">該月消費紀錄</p>
         <button onclick="toggleHistoryPage(true)" class="text-xs text-indigo-400 font-semibold hover:underline">查看完整歷史 ➡️</button>
       </div>
-      <div id="recent-list" class="space-y-2 flex-1 scrollable-list">
-        </div>
+      <div id="recent-list" class="space-y-2 flex-1 scrollable-list"></div>
     </div>
     
     <div class="safe-bottom w-full">
@@ -77,12 +98,11 @@
   <div id="history-page" class="page-slide fixed inset-0 bg-[#0b0f19] z-40 flex flex-col p-6 pt-12 transform translate-x-full">
     <div class="flex justify-between items-center mb-6">
       <button onclick="toggleHistoryPage(false)" class="text-sm text-gray-400 bg-gray-800 px-3 py-1.5 rounded-full flex items-center">⬅️ 返回首頁</button>
-      <h2 class="text-lg font-bold text-gray-200">完整歷史明細</h2>
+      <h2 class="text-lg font-bold text-gray-200">完整歷史總明細</h2>
       <div class="w-16"></div>
     </div>
 
-    <div id="full-history-list" class="flex-1 scrollable-list space-y-2.5 pb-2">
-      </div>
+    <div id="full-history-list" class="flex-1 scrollable-list space-y-2.5 pb-2"></div>
 
     <div class="pt-4 pb-4 border-t border-gray-800 safe-bottom">
       <button onclick="clearLocalOnly()" class="w-full bg-red-950/40 text-red-400 border border-red-900/50 py-3 rounded-xl text-xs font-medium active:scale-95 transition-transform">
@@ -157,21 +177,25 @@
 
 
   <script>
-    // ⚠️ 請在下方雙引號內填入你從 Google Sheets 部署得到的 Apps Script 網頁應用程式 URL
-    const GOOGLE_GAS_URL = "https://script.google.com/macros/s/AKfycbw11Uaq8LF_vkboYpLGJwk3152Ru6YkKO-x8po49tWjaG26bbmDtA_g2daEmSo3Z1Sv/exec";
+    const GOOGLE_GAS_URL = "你的_GOOGLE_GAS_網頁應用程式_網址";
 
     let currentStep = 1;
     let chartInstance = null;
     let editingId = null; 
+    let scrollTimeout = null;
     
+    // 追蹤當前滑動選中的月份（格式: "YYYY-MM"）
+    let selectedMonthStr = new Date().toLocaleDateString('en-CA').substring(0, 7);
+    let availableMonths = []; // 存儲所有有記帳數據的月份清單
+
     let currentRecord = { id: '', date: '', category: '', detail: '', amount: 0, note: '', synced: false };
 
     const stepTitles = { 1: "步驟 1: 選擇日期", 2: "步驟 2: 選擇大項目", 3: "步驟 3: 輸入細項說明", 4: "步驟 4: 輸入消費金額", 5: "步驟 5: 填寫備註 (選填)" };
-    const categoryIcons = { '餐飲': '🍔', '交通': '🚗', '娛樂': '🎉', '購物': '🛍️', '居家': '🏠', '其他': '✨' };
+    const categoryIcons = { '餐飲食': '🍔', '餐飲': '🍔', '交通': '🚗', '娛樂': '🎉', '購物': '🛍️', '居家': '🏠', '其他': '✨' };
 
     window.onload = function() {
       initChart();
-      updateDashboard();
+      updateDashboard(true); // 首次加載需要重構卡片
     };
 
     function toggleHistoryPage(show) {
@@ -239,7 +263,7 @@
     function selectCategory(catName) {
       currentRecord.category = catName;
       highlightCategoryButton(catName);
-      setTimeout(() => { nextStep(); }, 200);
+      setTimeout(() => { nextStep(); }, 120);
     }
 
     function highlightCategoryButton(catName) {
@@ -282,7 +306,7 @@
 
     function saveRecord() {
       const records = getRecords();
-      currentRecord.synced = false; // 先預設為尚未同步成功
+      currentRecord.synced = false; 
 
       if (editingId !== null) {
         const index = records.findIndex(r => r.id === editingId);
@@ -292,11 +316,15 @@
       }
       
       localStorage.setItem('cool_ledger_data', JSON.stringify(records));
-      closeLedger();
-      updateDashboard();
+      
+      // 記帳完，將視角自動切回該筆消費的月份
+      selectedMonthStr = currentRecord.date.substring(0, 7);
 
-      // 背景即時向雲端發射資料
-      sendToCloud(currentRecord);
+      closeLedger();
+      updateDashboard(true); // 重新建立卡片
+
+      const payloadToSend = { ...currentRecord };
+      setTimeout(() => { sendToCloud(payloadToSend); }, 10);
     }
 
     function deleteCurrentRecord() {
@@ -306,15 +334,14 @@
         let records = getRecords();
         records = records.filter(r => r.id !== idToDelete);
         localStorage.setItem('cool_ledger_data', JSON.stringify(records));
+        
         closeLedger();
-        updateDashboard();
+        updateDashboard(true); // 刪除可能導致某月份消失，重新建立卡片
 
-        // 背景即時向雲端發射「刪除指令」
-        sendToCloud({ id: idToDelete, action: "delete" });
+        setTimeout(() => { sendToCloud({ id: idToDelete, action: "delete" }); }, 10);
       }
     }
 
-    // 斷開雲端連結，純粹清除手機快取
     function clearLocalOnly() {
       const records = getRecords();
       if (records.length === 0) return alert("本地目前本來就是空的喔！");
@@ -322,9 +349,10 @@
       if (confirm("確定要刷掉「這台手機上」的所有紀錄嗎？\n\n⚠️ 注意：這只會清空手機畫面，你在 Google 試算表上的資料會完整保留，完全不受影響！")) {
         if (confirm("最後確認：真的要清空手機端嗎？（此動作無法復原）")) {
           localStorage.removeItem('cool_ledger_data'); 
+          selectedMonthStr = new Date().toLocaleDateString('en-CA').substring(0, 7);
           alert("🧹 本地紀錄已完全刷洗乾淨！");
           toggleHistoryPage(false);
-          updateDashboard();
+          updateDashboard(true);
         }
       }
     }
@@ -339,14 +367,13 @@
         body: JSON.stringify(payload)
       })
       .then(() => {
-        // 同步成功後，如果不是刪除動作，就把該筆資料狀態洗成 true
         if (payload.action !== "delete") {
           const records = getRecords();
           const target = records.find(r => r.id === payload.id);
           if (target) {
             target.synced = true;
             localStorage.setItem('cool_ledger_data', JSON.stringify(records));
-            updateDashboard();
+            updateDashboard(false); // 僅更新同步標籤狀態，不重建卡片防止干擾滑動
           }
         }
       })
@@ -362,6 +389,24 @@
         data: { labels: [], datasets: [{ data: [], backgroundColor: ['#f87171', '#60a5fa', '#fbbf24', '#34d399', '#a78bfa', '#9ca3af'], borderWidth: 0 }] },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
       });
+    }
+
+    // 🚀 核心監聽：當使用者滑動輸送帶時
+    function handleSliderScroll() {
+      clearTimeout(scrollTimeout);
+      // 防抖處理：等使用者手停下來 50 毫秒後才判定切換
+      scrollTimeout = setTimeout(() => {
+        const slider = document.getElementById('month-slider');
+        const cardWidth = slider.clientWidth;
+        if (cardWidth === 0) return;
+        
+        // 計算當前滑到第幾張卡片
+        const pageIndex = Math.round(slider.scrollLeft / cardWidth);
+        if (availableMonths[pageIndex] && availableMonths[pageIndex] !== selectedMonthStr) {
+          selectedMonthStr = availableMonths[pageIndex];
+          updateDashboard(false); // 刷新該月份的圓餅圖與明細
+        }
+      }, 50);
     }
 
     function createItemHtml(r) {
@@ -387,11 +432,60 @@
       `;
     }
 
-    function updateDashboard() {
+    // 🚀 核心渲染邏輯：重構與連動
+    function updateDashboard(rebuildSlider = false) {
       const records = getRecords();
-      const currentMonthStr = new Date().toLocaleDateString('en-CA').substring(0, 7);
+      
+      // 1. 找出所有存在數據的月份
+      const monthsSet = new Set();
+      const thisMonthStr = new Date().toLocaleDateString('en-CA').substring(0, 7);
+      monthsSet.add(thisMonthStr); // 確保不管有沒有記帳，一定有當月卡片
+      
+      records.forEach(r => {
+        if (r.date && r.date.length >= 7) {
+          monthsSet.add(r.date.substring(0, 7));
+        }
+      });
+      
+      // 由舊到新排序月份
+      availableMonths = Array.from(monthsSet).sort();
 
-      let total = 0;
+      // 2. 如果要求重構 Slider (新增、刪除或初始化時)
+      if (rebuildSlider) {
+        const slider = document.getElementById('month-slider');
+        slider.innerHTML = '';
+        
+        // 算出每個月份的總金額
+        availableMonths.forEach(mStr => {
+          let mTotal = 0;
+          records.forEach(r => {
+            if (r.date.startsWith(mStr)) mTotal += r.amount;
+          });
+          
+          const [year, month] = mStr.split('-');
+          slider.innerHTML += `
+            <div class="snap-card text-center py-4">
+              <p class="text-xs text-gray-400 tracking-wider">${year} 年 ${month} 月累計</p>
+              <h1 class="text-4xl font-extrabold text-indigo-400 mt-0.5">$${mTotal.toLocaleString()}</h1>
+            </div>
+          `;
+        });
+
+        // 定位到當前選中的月份卡片
+        setTimeout(() => {
+          const targetIndex = availableMonths.indexOf(selectedMonthStr);
+          if (targetIndex !== -1) {
+            slider.scrollLeft = targetIndex * slider.clientWidth;
+          }
+        }, 100);
+      }
+
+      // 3. 更新頂部 Badge 狀態標籤
+      const [sYear, sMonth] = selectedMonthStr.split('-');
+      document.getElementById('current-month-badge').innerText = `${sYear} 年 ${sMonth} 月`;
+
+      // 4. 計算選中月份的明細與圓餅圖數據
+      let selectedMonthTotal = 0;
       const catTotals = {};
       
       const recentList = document.getElementById('recent-list');
@@ -400,29 +494,28 @@
       recentList.innerHTML = '';
       fullHistoryList.innerHTML = '';
 
+      // 排序歷史紀錄 (最新在上)
       const sortedRecords = [...records].sort((a, b) => new Date(b.date) - new Date(a.date));
-      let recentCount = 0;
+      let matchMonthCount = 0;
 
       sortedRecords.forEach((r) => {
-        if (r.date.startsWith(currentMonthStr)) {
-          total += r.amount;
-          catTotals[r.category] = (catTotals[r.category] || 0) + r.amount;
-        }
-
         const html = createItemHtml(r);
-        fullHistoryList.insertAdjacentHTML('beforeend', html);
+        fullHistoryList.insertAdjacentHTML('beforeend', html); // 總明細頁面包含所有歷史
 
-        if (recentCount < 3) {
+        // 主畫面明細則只顯示當前滑動選中月份的資料
+        if (r.date.startsWith(selectedMonthStr)) {
+          selectedMonthTotal += r.amount;
+          catTotals[r.category] = (catTotals[r.category] || 0) + r.amount;
+          
           recentList.insertAdjacentHTML('beforeend', html);
-          recentCount++;
+          matchMonthCount++;
         }
       });
 
-      if (recentList.innerHTML === '') recentList.innerHTML = '<p class="text-center text-xs text-gray-600 py-4">本月尚無任何明細</p>';
-      if (fullHistoryList.innerHTML === '') fullHistoryList.innerHTML = '<p class="text-center text-xs text-gray-600 py-8">目前沒有任何記帳紀錄</p>';
+      if (matchMonthCount === 0) recentList.innerHTML = '<p class="text-center text-xs text-gray-600 py-4">該月份尚無任何明細</p>';
+      if (records.length === 0) fullHistoryList.innerHTML = '<p class="text-center text-xs text-gray-600 py-8">目前沒有任何記帳紀錄</p>';
 
-      document.getElementById('total-amount').innerText = `$${total.toLocaleString()}`;
-
+      // 5. 更新圓餅圖
       const labels = Object.keys(catTotals);
       const data = Object.values(catTotals);
 
