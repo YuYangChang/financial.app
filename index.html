@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>記帳Web</title>
+  <title>酷記帳 PWA</title>
   
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="記帳Web">
+  <meta name="apple-mobile-web-app-title" content="酷記帳">
   
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%23111827%22/><text y=%22.9em%22 x=%227%22 font-size=%2276%22>💰</text></svg>">
   
@@ -41,7 +41,7 @@
   <div id="main-screen" class="flex flex-col h-full justify-between p-6 pt-12">
     
     <div class="flex justify-between items-center w-full">
-      <span class="text-xl font-bold text-gray-200">記帳Web</span>
+      <span class="text-xl font-bold text-gray-200">酷記帳</span>
       <span class="text-xs text-gray-500 bg-gray-900 border border-gray-800 px-2.5 py-1 rounded-full">⚡️ 雲端即時連動</span>
     </div>
 
@@ -62,7 +62,8 @@
         <p class="text-xs text-gray-400 font-medium">近期消費紀錄</p>
         <button onclick="toggleHistoryPage(true)" class="text-xs text-indigo-400 font-semibold hover:underline">查看完整歷史 ➡️</button>
       </div>
-      <div id="recent-list" class="space-y-2 flex-1 scrollable-list"></div>
+      <div id="recent-list" class="space-y-2 flex-1 scrollable-list">
+        </div>
     </div>
     
     <div class="safe-bottom w-full">
@@ -80,7 +81,14 @@
       <div class="w-16"></div>
     </div>
 
-    <div id="full-history-list" class="flex-1 scrollable-list space-y-2.5 pb-8"></div>
+    <div id="full-history-list" class="flex-1 scrollable-list space-y-2.5 pb-2">
+      </div>
+
+    <div class="pt-4 pb-4 border-t border-gray-800 safe-bottom">
+      <button onclick="clearLocalOnly()" class="w-full bg-red-950/40 text-red-400 border border-red-900/50 py-3 rounded-xl text-xs font-medium active:scale-95 transition-transform">
+        ⚠️ 僅清空手機本地紀錄 (不影響雲端試算表)
+      </button>
+    </div>
   </div>
 
 
@@ -102,7 +110,7 @@
       <div id="form-container" class="space-y-6 min-h-[220px] flex flex-col justify-center">
         <div id="step-1" class="step-field space-y-2">
           <label class="block text-sm text-gray-400">消費日期</label>
-          <input type="date" id="input-date" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white">
+          <input type="date" id="input-date" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500">
         </div>
         <div id="step-2" class="step-field space-y-3 hidden">
           <label class="block text-sm text-gray-400">選擇大項目</label>
@@ -129,15 +137,15 @@
         </div>
         <div id="step-3" class="step-field space-y-2 hidden">
           <label class="block text-sm text-gray-400">消費細項說明</label>
-          <input type="text" id="input-detail" placeholder="例如：午餐便當..." class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white" autocomplete="off">
+          <input type="text" id="input-detail" placeholder="例如：午餐便當..." class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500" autocomplete="off">
         </div>
         <div id="step-4" class="step-field space-y-2 hidden">
           <label class="block text-sm text-gray-400">金額 ($)</label>
-          <input type="number" id="input-amount" inputmode="decimal" placeholder="0" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white text-xl font-bold">
+          <input type="number" id="input-amount" inputmode="decimal" placeholder="0" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white text-xl font-bold focus:outline-none focus:border-indigo-500">
         </div>
         <div id="step-5" class="step-field space-y-2 hidden">
           <label class="block text-sm text-gray-400">備註 (選填)</label>
-          <input type="text" id="input-note" placeholder="想寫什麼都可以..." class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white" autocomplete="off">
+          <input type="text" id="input-note" placeholder="想寫什麼都可以..." class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500" autocomplete="off">
         </div>
       </div>
 
@@ -149,7 +157,7 @@
 
 
   <script>
-    // ⚠️ 貼上你新部署的 Google GAS 網址
+    // ⚠️ 請在下方雙引號內填入你從 Google Sheets 部署得到的 Apps Script 網頁應用程式 URL
     const GOOGLE_GAS_URL = "https://script.google.com/macros/s/AKfycbw11Uaq8LF_vkboYpLGJwk3152Ru6YkKO-x8po49tWjaG26bbmDtA_g2daEmSo3Z1Sv/exec";
 
     let currentStep = 1;
@@ -272,10 +280,9 @@
       }
     }
 
-    // 🌟 核心升級：本地立刻存，隨後「自動即時同步」雲端
     function saveRecord() {
       const records = getRecords();
-      currentRecord.synced = false; // 先設為同步中(false)
+      currentRecord.synced = false; // 先預設為尚未同步成功
 
       if (editingId !== null) {
         const index = records.findIndex(r => r.id === editingId);
@@ -286,13 +293,12 @@
       
       localStorage.setItem('cool_ledger_data', JSON.stringify(records));
       closeLedger();
-      updateDashboard(); // 畫面上立刻跳出「⏳ 同步中」
+      updateDashboard();
 
-      // ⚡️ 自動觸發雲端同步發射
+      // 背景即時向雲端發射資料
       sendToCloud(currentRecord);
     }
 
-    // 🌟 核心升級：本地立刻刪除，隨後「自動即時同步刪除」雲端
     function deleteCurrentRecord() {
       if (editingId === null) return;
       if (confirm('確定要刪除這筆紀錄嗎？（雲端也會自動連動刪除）')) {
@@ -303,12 +309,26 @@
         closeLedger();
         updateDashboard();
 
-        // ⚡️ 自動送出刪除訊號給雲端
+        // 背景即時向雲端發射「刪除指令」
         sendToCloud({ id: idToDelete, action: "delete" });
       }
     }
 
-    // 🚀 負責在背景默默和 Google 通訊的函式
+    // 斷開雲端連結，純粹清除手機快取
+    function clearLocalOnly() {
+      const records = getRecords();
+      if (records.length === 0) return alert("本地目前本來就是空的喔！");
+
+      if (confirm("確定要刷掉「這台手機上」的所有紀錄嗎？\n\n⚠️ 注意：這只會清空手機畫面，你在 Google 試算表上的資料會完整保留，完全不受影響！")) {
+        if (confirm("最後確認：真的要清空手機端嗎？（此動作無法復原）")) {
+          localStorage.removeItem('cool_ledger_data'); 
+          alert("🧹 本地紀錄已完全刷洗乾淨！");
+          toggleHistoryPage(false);
+          updateDashboard();
+        }
+      }
+    }
+
     function sendToCloud(payload) {
       if (!GOOGLE_GAS_URL || GOOGLE_GAS_URL.includes("你的")) return;
 
@@ -319,14 +339,14 @@
         body: JSON.stringify(payload)
       })
       .then(() => {
-        // 如果不是刪除動作，就把該筆本地資料更新為「已同步」
+        // 同步成功後，如果不是刪除動作，就把該筆資料狀態洗成 true
         if (payload.action !== "delete") {
           const records = getRecords();
           const target = records.find(r => r.id === payload.id);
           if (target) {
             target.synced = true;
             localStorage.setItem('cool_ledger_data', JSON.stringify(records));
-            updateDashboard(); // 刷新畫面，狀態會秒變「☁️ 已同步」
+            updateDashboard();
           }
         }
       })
