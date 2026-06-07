@@ -304,6 +304,7 @@
       }
     }
 
+    // 🚀 修正版：使用當下快照，徹底解決多筆連續同步卡死問題
     function saveRecord() {
       const records = getRecords();
       currentRecord.synced = false; 
@@ -317,16 +318,23 @@
       
       localStorage.setItem('cool_ledger_data', JSON.stringify(records));
       
-      // 記帳完，將視角自動切回該筆消費的月份
+      // 1. 先記錄「當下這一筆」的完整資料快照，防止被後續動作污染
+      const uniquePayload = JSON.parse(JSON.stringify(currentRecord));
+
+      // 2. 記帳完，將視角自動切回該筆消費的月份
       selectedMonthStr = currentRecord.date.substring(0, 7);
 
+      // 3. 立刻關閉視窗與更新 UI，維持極致流暢度
       closeLedger();
-      updateDashboard(true); // 重新建立卡片
+      updateDashboard(true); 
 
-      const payloadToSend = { ...currentRecord };
-      setTimeout(() => { sendToCloud(payloadToSend); }, 10);
+      // 4. 將這組「絕對獨立」的快照資料丟進背景同步
+      setTimeout(() => { 
+        sendToCloud(uniquePayload); 
+      }, 30);
     }
 
+    // 🚀 修正版：刪除連動一併修正快照機制
     function deleteCurrentRecord() {
       if (editingId === null) return;
       if (confirm('確定要刪除這筆紀錄嗎？（雲端也會自動連動刪除）')) {
@@ -336,9 +344,12 @@
         localStorage.setItem('cool_ledger_data', JSON.stringify(records));
         
         closeLedger();
-        updateDashboard(true); // 刪除可能導致某月份消失，重新建立卡片
+        updateDashboard(true); 
 
-        setTimeout(() => { sendToCloud({ id: idToDelete, action: "delete" }); }, 10);
+        // 使用獨立 ID 快照丟進背景
+        setTimeout(() => {
+          sendToCloud({ id: idToDelete, action: "delete" });
+        }, 30);
       }
     }
 
