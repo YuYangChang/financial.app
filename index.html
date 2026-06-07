@@ -15,7 +15,6 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   
   <style>
-    /* 讓 PWA 更像原生 App 的體驗，防止網頁上下橡皮筋回彈 */
     html, body {
       position: fixed;
       width: 100%;
@@ -28,26 +27,44 @@
     .safe-bottom {
       padding-bottom: env(safe-area-inset-bottom);
     }
+    /* 讓明細列表可以滾動，但主頁面固定 */
+    .scrollable-list {
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
   </style>
 </head>
 <body class="font-sans antialiased">
 
   <div id="main-screen" class="flex flex-col h-full justify-between p-6 pt-12">
     
-    <div class="flex-1 flex flex-col items-center justify-center space-y-6">
+    <div class="flex justify-between items-center w-full">
+      <span class="text-xl font-bold text-gray-200">酷記帳</span>
+      <button onclick="syncToGoogle()" class="flex items-center space-x-1 bg-gray-800 text-xs text-indigo-400 border border-indigo-500/30 px-3 py-1.5 rounded-full active:scale-95">
+        <span>☁️ 同步到雲端</span>
+      </button>
+    </div>
+
+    <div class="flex flex-col items-center justify-center space-y-4 my-2">
       <div class="text-center">
-        <p class="text-sm text-gray-400 tracking-wider font-medium">本月目前累計消費</p>
-        <h1 id="total-amount" class="text-4xl font-extrabold text-indigo-400 mt-1">$0</h1>
+        <p class="text-xs text-gray-400 tracking-wider">本月累計消費</p>
+        <h1 id="total-amount" class="text-3xl font-extrabold text-indigo-400 mt-0.5">$0</h1>
       </div>
       
-      <div class="w-64 h-64 relative flex items-center justify-center">
+      <div class="w-40 h-40 relative flex items-center justify-center">
         <canvas id="expense-chart"></canvas>
-        <div id="no-data-tip" class="absolute text-gray-500 text-sm hidden">本月尚無記帳數據</div>
+        <div id="no-data-tip" class="absolute text-gray-500 text-xs hidden">本月尚無數據</div>
       </div>
     </div>
+
+    <div class="flex-1 scrollable-list border-t border-gray-800/80 pt-3 mb-4">
+      <p class="text-xs text-gray-400 font-medium mb-2 sticky top-0 bg-[#0b0f19] py-1">當月消費細項 (點擊可編輯)</p>
+      <div id="history-list" class="space-y-2">
+        </div>
+    </div>
     
-    <div class="safe-bottom w-full mb-4">
-      <button onclick="openLedger()" class="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-indigo-500/30 active:scale-95 transition-transform duration-100 text-lg">
+    <div class="safe-bottom w-full">
+      <button onclick="openLedger()" class="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold py-3.5 rounded-2xl shadow-lg active:scale-95 transition-transform duration-100 text-base">
         + 新增一筆消費
       </button>
     </div>
@@ -58,135 +75,130 @@
       
       <div class="flex justify-between items-center">
         <h2 id="step-title" class="text-xl font-bold text-gray-200">步驟 1: 選擇日期</h2>
-        <button onclick="closeLedger()" class="text-gray-400 hover:text-white text-sm bg-gray-800 px-3 py-1 rounded-full">取消</button>
+        <div class="flex space-x-2">
+          <button id="delete-btn" onclick="deleteCurrentRecord()" class="text-red-400 text-sm bg-red-950/40 border border-red-900 px-3 py-1 rounded-full hidden">刪除</button>
+          <button onclick="closeLedger()" class="text-gray-400 text-sm bg-gray-800 px-3 py-1 rounded-full">取消</button>
+        </div>
       </div>
 
       <div class="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden">
         <div id="progress-bar" class="bg-indigo-500 h-full w-1/5 transition-all duration-300"></div>
       </div>
 
-      <div id="form-container" class="space-y-6 min-h-[250px] flex flex-col justify-center">
-        
+      <div id="form-container" class="space-y-6 min-h-[220px] flex flex-col justify-center">
         <div id="step-1" class="step-field space-y-2">
           <label class="block text-sm text-gray-400">消費日期</label>
           <input type="date" id="input-date" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500">
         </div>
-
         <div id="step-2" class="step-field space-y-3 hidden">
           <label class="block text-sm text-gray-400">選擇大項目</label>
           <div class="grid grid-cols-3 gap-3">
-            <button onclick="selectCategory('餐飲', '🍔')" class="cat-btn bg-gray-800 hover:bg-gray-700 p-4 rounded-xl flex flex-col items-center space-y-1 border border-transparent">
+            <button onclick="selectCategory('餐飲')" class="cat-btn bg-gray-800 p-4 rounded-xl flex flex-col items-center space-y-1 border border-transparent">
               <span class="text-2xl">🍔</span><span class="text-sm">餐飲</span>
             </button>
-            <button onclick="selectCategory('交通', '🚗')" class="cat-btn bg-gray-800 hover:bg-gray-700 p-4 rounded-xl flex flex-col items-center space-y-1 border border-transparent">
+            <button onclick="selectCategory('交通')" class="cat-btn bg-gray-800 p-4 rounded-xl flex flex-col items-center space-y-1 border border-transparent">
               <span class="text-2xl">🚗</span><span class="text-sm">交通</span>
             </button>
-            <button onclick="selectCategory('娛樂', '🎉')" class="cat-btn bg-gray-800 hover:bg-gray-700 p-4 rounded-xl flex flex-col items-center space-y-1 border border-transparent">
+            <button onclick="selectCategory('娛樂')" class="cat-btn bg-gray-800 p-4 rounded-xl flex flex-col items-center space-y-1 border border-transparent">
               <span class="text-2xl">🎉</span><span class="text-sm">娛樂</span>
             </button>
-            <button onclick="selectCategory('購物', '🛍️')" class="cat-btn bg-gray-800 hover:bg-gray-700 p-4 rounded-xl flex flex-col items-center space-y-1 border border-transparent">
+            <button onclick="selectCategory('購物')" class="cat-btn bg-gray-800 p-4 rounded-xl flex flex-col items-center space-y-1 border border-transparent">
               <span class="text-2xl">🛍️</span><span class="text-sm">購物</span>
             </button>
-            <button onclick="selectCategory('居家', '🏠')" class="cat-btn bg-gray-800 hover:bg-gray-700 p-4 rounded-xl flex flex-col items-center space-y-1 border border-transparent">
+            <button onclick="selectCategory('居家')" class="cat-btn bg-gray-800 p-4 rounded-xl flex flex-col items-center space-y-1 border border-transparent">
               <span class="text-2xl">🏠</span><span class="text-sm">居家</span>
             </button>
-            <button onclick="selectCategory('其他', '✨')" class="cat-btn bg-gray-800 hover:bg-gray-700 p-4 rounded-xl flex flex-col items-center space-y-1 border border-transparent">
+            <button onclick="selectCategory('其他')" class="cat-btn bg-gray-800 p-4 rounded-xl flex flex-col items-center space-y-1 border border-transparent">
               <span class="text-2xl">✨</span><span class="text-sm">其他</span>
             </button>
           </div>
         </div>
-
         <div id="step-3" class="step-field space-y-2 hidden">
           <label class="block text-sm text-gray-400">消費細項說明</label>
-          <input type="text" id="input-detail" placeholder="例如：午餐便當、飲料..." class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500" autocomplete="off">
+          <input type="text" id="input-detail" placeholder="例如：午餐便當..." class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500" autocomplete="off">
         </div>
-
         <div id="step-4" class="step-field space-y-2 hidden">
           <label class="block text-sm text-gray-400">金額 ($)</label>
           <input type="number" id="input-amount" inputmode="decimal" placeholder="0" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white text-xl font-bold focus:outline-none focus:border-indigo-500">
         </div>
-
         <div id="step-5" class="step-field space-y-2 hidden">
           <label class="block text-sm text-gray-400">備註 (選填)</label>
           <input type="text" id="input-note" placeholder="想寫什麼都可以..." class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500" autocomplete="off">
         </div>
-
       </div>
 
       <div class="pt-2">
-        <button id="next-btn" onclick="nextStep()" class="w-full bg-indigo-500 text-white font-bold py-3 rounded-xl active:scale-95 transition-transform duration-100">
-          下一步
-        </button>
+        <button id="next-btn" onclick="nextStep()" class="w-full bg-indigo-500 text-white font-bold py-3 rounded-xl active:scale-95 transition-transform duration-100"></button>
       </div>
-
     </div>
   </div>
 
   <script>
-    // 狀態管理
+    // ⚠️ 請在下方貼上你從 Google Sheets 部署得到的 Apps Script 網頁應用程式 URL
+    const GOOGLE_GAS_URL = "你的_GOOGLE_GAS_網頁應用程式_網址";
+
     let currentStep = 1;
     let chartInstance = null;
+    let editingIndex = null; // 紀錄當前是否在編輯某筆資料 (-1 或 null 代表新增)
     
-    // 暫存當前填寫數據
-    let currentRecord = {
-      date: '',
-      category: '',
-      detail: '',
-      amount: 0,
-      note: ''
-    };
+    let currentRecord = { date: '', category: '', detail: '', amount: 0, note: '' };
 
-    // 步驟定義
     const stepTitles = {
-      1: "步驟 1: 選擇日期",
-      2: "步驟 2: 選擇大項目",
-      3: "步驟 3: 輸入細項說明",
-      4: "步驟 4: 輸入消費金額",
-      5: "步驟 5: 填寫備註 (選填)"
+      1: "步驟 1: 選擇日期", 2: "步驟 2: 選擇大項目", 3: "步驟 3: 輸入細項說明", 4: "步驟 4: 輸入消費金額", 5: "步驟 5: 填寫備註 (選填)"
     };
 
-    // 初始化頁面
+    const categoryIcons = { '餐飲': '🍔', '交通': '🚗', '娛樂': '🎉', '購物': '🛍️', '居家': '🏠', '其他': '✨' };
+
     window.onload = function() {
       initChart();
       updateDashboard();
     };
 
-    // 打開記帳引導彈窗
-    function openLedger() {
-      currentStep = 1;
-      // 預設日期為今天 (台灣時區)
-      const today = new Date().toLocaleDateString('en-CA');
-      document.getElementById('input-date').value = today;
+    // 開啟記帳視窗 (可能是新增，也可能是編輯)
+    function openLedger(index = null) {
+      if (index !== null) {
+        // 進入【編輯模式】
+        editingIndex = index;
+        const records = getRecords();
+        currentRecord = { ...records[index] };
+        
+        document.getElementById('input-date').value = currentRecord.date;
+        document.getElementById('input-detail').value = currentRecord.detail;
+        document.getElementById('input-amount').value = currentRecord.amount;
+        document.getElementById('input-note').value = currentRecord.note;
+        document.getElementById('delete-btn').classList.remove('hidden');
+        
+        // 高亮大項目按鈕
+        highlightCategoryButton(currentRecord.category);
+      } else {
+        // 進入【新增模式】
+        editingIndex = null;
+        currentRecord = { date: '', category: '', detail: '', amount: 0, note: '' };
+        document.getElementById('input-date').value = new Date().toLocaleDateString('en-CA');
+        document.getElementById('input-detail').value = '';
+        document.getElementById('input-amount').value = '';
+        document.getElementById('input-note').value = '';
+        document.getElementById('delete-btn').classList.add('hidden');
+        clearCategoryButtons();
+      }
       
-      // 清空舊輸入值
-      document.getElementById('input-detail').value = '';
-      document.getElementById('input-amount').value = '';
-      document.getElementById('input-note').value = '';
-      document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('border-indigo-500', 'bg-indigo-900/40'));
-
+      currentStep = 1;
       showStep(currentStep);
-      document.getElementById('ledger-modal').classList.remove('hidden');
-      document.getElementById('ledger-modal').classList.add('flex');
+      document.getElementById('ledger-modal').classList.replace('hidden', 'flex');
     }
 
-    // 關閉彈窗回到主畫面
     function closeLedger() {
-      document.getElementById('ledger-modal').classList.add('hidden');
-      document.getElementById('ledger-modal').classList.remove('flex');
+      document.getElementById('ledger-modal').classList.replace('flex', 'hidden');
     }
 
-    // 切換顯示當前步驟
     function showStep(step) {
-      // 更新標題與進度條
       document.getElementById('step-title').innerText = stepTitles[step];
       document.getElementById('progress-bar').style.width = `${(step / 5) * 100}%`;
 
-      // 隱藏所有步驟，只顯示當前步驟
       for (let i = 1; i <= 5; i++) {
         const field = document.getElementById(`step-${i}`);
         if (i === step) {
           field.classList.remove('hidden');
-          // 自動聚焦輸入框，優化 iPhone 輸入體驗
           if (step === 3) document.getElementById('input-detail').focus();
           if (step === 4) document.getElementById('input-amount').focus();
           if (step === 5) document.getElementById('input-note').focus();
@@ -195,10 +207,9 @@
         }
       }
 
-      // 變更按鈕文字
       const nextBtn = document.getElementById('next-btn');
       if (step === 5) {
-        nextBtn.innerText = "完成記帳並儲存";
+        nextBtn.innerText = editingIndex !== null ? "儲存修改" : "完成記帳並儲存";
         nextBtn.classList.replace('bg-indigo-500', 'bg-emerald-500');
       } else {
         nextBtn.innerText = "下一步";
@@ -206,11 +217,13 @@
       }
     }
 
-    // 處理選擇大項目
-    function selectCategory(catName, icon) {
+    function selectCategory(catName) {
       currentRecord.category = catName;
-      
-      // 視覺反饋：高亮被選中的按鈕
+      highlightCategoryButton(catName);
+      setTimeout(() => { nextStep(); }, 200);
+    }
+
+    function highlightCategoryButton(catName) {
       document.querySelectorAll('.cat-btn').forEach(btn => {
         if (btn.innerText.includes(catName)) {
           btn.classList.add('border-indigo-500', 'bg-indigo-900/40');
@@ -218,36 +231,32 @@
           btn.classList.remove('border-indigo-500', 'bg-indigo-900/40');
         }
       });
-
-      // 選完大項目後，自動幫使用者跨入下一步，省去點擊
-      setTimeout(() => { nextStep(); }, 200);
     }
 
-    // 點擊下一步的防呆與邏輯
+    function clearCategoryButtons() {
+      document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('border-indigo-500', 'bg-indigo-900/40'));
+    }
+
     function nextStep() {
       if (currentStep === 1) {
         currentRecord.date = document.getElementById('input-date').value;
         if (!currentRecord.date) return alert('請選擇日期');
-        currentStep = 2;
-        showStep(currentStep);
+        currentStep = 2; showStep(currentStep);
       } 
       else if (currentStep === 2) {
         if (!currentRecord.category) return alert('請選擇一個大項目');
-        currentStep = 3;
-        showStep(currentStep);
+        currentStep = 3; showStep(currentStep);
       } 
       else if (currentStep === 3) {
         currentRecord.detail = document.getElementById('input-detail').value.trim();
         if (!currentRecord.detail) return alert('請填寫細項說明');
-        currentStep = 4;
-        showStep(currentStep);
+        currentStep = 4; showStep(currentStep);
       } 
       else if (currentStep === 4) {
         const amt = parseFloat(document.getElementById('input-amount').value);
         if (isNaN(amt) || amt <= 0) return alert('請輸入正確的金額');
         currentRecord.amount = amt;
-        currentStep = 5;
-        showStep(currentStep);
+        currentStep = 5; showStep(currentStep);
       } 
       else if (currentStep === 5) {
         currentRecord.note = document.getElementById('input-note').value.trim();
@@ -255,79 +264,139 @@
       }
     }
 
-    // 儲存資料至 localStorage
+    // 儲存（包含新增與修改）
     function saveRecord() {
-      const records = JSON.parse(localStorage.getItem('cool_ledger_data') || '[]');
-      records.push({...currentRecord});
+      const records = getRecords();
+      if (editingIndex !== null) {
+        records[editingIndex] = { ...currentRecord }; // 取代舊資料
+      } else {
+        records.push({ ...currentRecord }); // 新增
+      }
       localStorage.setItem('cool_ledger_data', JSON.stringify(records));
-      
-      // 記完一筆自動回到主畫面
       closeLedger();
-      // 刷新主畫面數據與圖表
       updateDashboard();
     }
 
-    // 初始化 Chart.js 圓餅圖
+    // 刪除目前選中的紀錄
+    function deleteCurrentRecord() {
+      if (editingIndex === null) return;
+      if (confirm('確定要刪除這筆紀錄嗎？')) {
+        const records = getRecords();
+        records.splice(editingIndex, 1);
+        localStorage.setItem('cool_ledger_data', JSON.stringify(records));
+        closeLedger();
+        updateDashboard();
+      }
+    }
+
+    function getRecords() {
+      return JSON.parse(localStorage.getItem('cool_ledger_data') || '[]');
+    }
+
+    // 同步到 Google 試算表
+    function syncToGoogle() {
+      if (!GOOGLE_GAS_URL || GOOGLE_GAS_URL.includes("你的")) {
+        return alert("請先在 HTML 內填入你部署的 Google GAS 網址！");
+      }
+      
+      const records = getRecords();
+      if (records.length === 0) return alert("目前本地沒有任何資料可以同步！");
+
+      if (!confirm(`準備將本地共 ${records.length} 筆資料同步至 Google 試算表？\n(注意：這會將目前所有資料整批追加進去)`)) return;
+
+      // 顯示同步中狀態
+      const syncBtn = document.querySelector('button[onclick="syncToGoogle()"]');
+      const originalText = syncBtn.innerHTML;
+      syncBtn.innerHTML = "⏳ 同步中...";
+      syncBtn.disabled = true;
+
+      fetch(GOOGLE_GAS_URL, {
+        method: 'POST',
+        mode: 'no-cors', // 允許跨網域
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(records)
+      })
+      .then(() => {
+        alert("🎉 同步指令已發送至雲端！請檢查 Google 試算表。");
+      })
+      .catch(err => {
+        alert("同步失敗，請檢查網路或 GAS 設定：" + err);
+      })
+      .finally(() => {
+        syncBtn.innerHTML = originalText;
+        syncBtn.disabled = false;
+      });
+    }
+
     function initChart() {
       const ctx = document.getElementById('expense-chart').getContext('2d');
       chartInstance = new Chart(ctx, {
-        type: 'doughnut', // 使用環狀圓餅圖，更有現代感
+        type: 'doughnut',
         data: {
           labels: [],
-          datasets: [{
-            data: [],
-            backgroundColor: ['#f87171', '#60a5fa', '#fbbf24', '#34d399', '#a78bfa', '#9ca3af'],
-            borderWidth: 0
-          }]
+          datasets: [{ data: [], backgroundColor: ['#f87171', '#60a5fa', '#fbbf24', '#34d399', '#a78bfa', '#9ca3af'], borderWidth: 0 }]
         },
         options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              display: true,
-              position: 'bottom',
-              labels: { color: '#9ca3af', font: { size: 12 } }
-            }
-          }
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } } // 縮小圖表，隱藏圖例
         }
       });
     }
 
-    // 讀取本月資料並更新 Dashboard
     function updateDashboard() {
-      const records = JSON.parse(localStorage.getItem('cool_ledger_data') || '[]');
-      
-      // 取得當前月份 (YYYY-MM)
+      const records = getRecords();
       const currentMonthStr = new Date().toLocaleDateString('en-CA').substring(0, 7);
 
-      // 過濾出當月資料
+      // 過濾當月資料
       const thisMonthRecords = records.filter(r => r.date.startsWith(currentMonthStr));
 
-      // 計算總金額與各大項統計
       let total = 0;
       const catTotals = {};
+      const historyList = document.getElementById('history-list');
+      historyList.innerHTML = ''; // 清空列表
 
-      thisMonthRecords.forEach(r => {
-        total += r.amount;
-        catTotals[r.category] = (catTotals[r.category] || 0) + r.amount;
+      // 渲染歷史列表（依照時間倒序排列，最新的在上面）
+      records.forEach((r, index) => {
+        // 只統計當月的金額與圖表
+        if (r.date.startsWith(currentMonthStr)) {
+          total += r.amount;
+          catTotals[r.category] = (catTotals[r.category] || 0) + r.amount;
+        }
+
+        // 列表渲染全部或當月皆可，這裡渲染當月資料方便對齊
+        if (r.date.startsWith(currentMonthStr)) {
+          const icon = categoryIcons[r.category] || '✨';
+          const itemHtml = `
+            <div onclick="openLedger(${index})" class="flex justify-between items-center bg-gray-900/60 border border-gray-800/60 rounded-xl p-3 active:bg-gray-800 transition-colors">
+              <div class="flex items-center space-x-3">
+                <span class="text-xl bg-gray-800 p-1.5 rounded-lg">${icon}</span>
+                <div>
+                  <p class="text-sm font-bold text-gray-200">${r.detail}</p>
+                  <p class="text-[10px] text-gray-500">${r.date.substring(5)} ${r.note ? '· ' + r.note : ''}</p>
+                </div>
+              </div>
+              <span class="text-sm font-extrabold text-indigo-400">$${r.amount}</span>
+            </div>
+          `;
+          historyList.insertAdjacentHTML('afterbegin', itemHtml); // 新的在最上面
+        }
       });
 
-      // 更新總金額顯示
+      if (historyList.innerHTML === '') {
+        historyList.innerHTML = '<p class="text-center text-xs text-gray-600 py-4">這個月還沒有任何記帳明細喔！</p>';
+      }
+
       document.getElementById('total-amount').innerText = `$${total.toLocaleString()}`;
 
-      // 更新圖表
       const labels = Object.keys(catTotals);
       const data = Object.values(catTotals);
 
       if (labels.length === 0) {
         document.getElementById('no-data-tip').classList.remove('hidden');
-        chartInstance.data.labels = [];
-        chartInstance.data.datasets[0].data = [];
+        chartInstance.data.labels = []; chartInstance.data.datasets[0].data = [];
       } else {
         document.getElementById('no-data-tip').classList.add('hidden');
-        chartInstance.data.labels = labels;
-        chartInstance.data.datasets[0].data = data;
+        chartInstance.data.labels = labels; chartInstance.data.datasets[0].data = data;
       }
       chartInstance.update();
     }
